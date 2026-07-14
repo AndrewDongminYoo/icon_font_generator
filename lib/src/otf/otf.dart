@@ -68,6 +68,7 @@ class OpenTypeFont implements BinaryCodable {
     bool? useOpenType,
     bool? usePostV2,
     bool? normalize,
+    Map<String, int>? charCodes,
   }) {
     if (fontName?.isEmpty ?? false) {
       fontName = null;
@@ -80,7 +81,9 @@ class OpenTypeFont implements BinaryCodable {
     normalize ??= true;
     usePostV2 ??= false;
 
-    glyphList = _generateCharCodes(glyphList);
+    glyphList = charCodes != null
+        ? _applyCharCodes(glyphList, charCodes)
+        : _generateCharCodes(glyphList);
 
     // A power of two is recommended only for TrueType outlines
     final unitsPerEm =
@@ -290,6 +293,52 @@ class OpenTypeFont implements BinaryCodable {
     for (var i = 0; i < glyphList.length; i++) {
       glyphList[i].metadata.charCode = kUnicodePrivateUseAreaStart + i;
     }
+    return glyphList;
+  }
+
+  // Explicit codepoints are restricted to the BMP Private Use Area
+  // (U+E000..U+F8FF): it is what icon fonts use, it is encoded correctly by
+  // both cmap format 4 and 12, and — unlike arbitrary BMP values — it stays
+  // within the coverage advertised by the OS/2 ulUnicodeRange bits (Basic
+  // Latin + PUA), so consumers that use OS/2 for font fallback still find the
+  // glyphs.
+  static const _kMinCharCode = kUnicodePrivateUseAreaStart; // 0xE000
+  static const _kMaxCharCode = 0xF8FF; // BMP PUA end
+
+  static List<GenericGlyph> _applyCharCodes(
+      List<GenericGlyph> glyphList, Map<String, int> charCodes) {
+    final usedCharCodes = <int>{};
+
+    for (final glyph in glyphList) {
+      final name = glyph.metadata.name;
+      final charCode = charCodes[name];
+
+      if (charCode == null) {
+        throw ArgumentError('No codepoint provided for glyph "$name"');
+      }
+
+      // Outside the PUA the value would either be truncated by the 16-bit
+      // format-4 encoder (non-BMP) or fall outside the font's advertised OS/2
+      // coverage (other BMP blocks), so reject it.
+      if (charCode < _kMinCharCode || charCode > _kMaxCharCode) {
+        throw ArgumentError(
+            'Codepoint for glyph "$name" must be in the BMP Private Use Area '
+            '(0xE000..0xF8FF), got $charCode');
+      }
+
+      if (!usedCharCodes.add(charCode)) {
+        throw ArgumentError(
+            'Duplicate codepoint $charCode assigned to glyph "$name"');
+      }
+
+      glyph.metadata.charCode = charCode;
+    }
+
+    // cmap format 4/12 segment generation assumes char codes are ascending in
+    // glyph order, so sort glyphs by their assigned codepoint before returning.
+    glyphList
+        .sort((a, b) => a.metadata.charCode!.compareTo(b.metadata.charCode!));
+
     return glyphList;
   }
 

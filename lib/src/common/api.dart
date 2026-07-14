@@ -25,10 +25,19 @@ class SvgToOtfResult {
 /// glyphs are resized and centered to fit in coordinates grid (unitsPerEm).
 /// Defaults to true.
 /// * [fontName] is a name for a generated font.
+/// * If [charCodes] is provided, each glyph named `n` is assigned codepoint
+/// `charCodes[n]` instead of the default sequential
+/// `kUnicodePrivateUseAreaStart + index` assignment. Glyphs are reordered by
+/// their assigned codepoint so the generated cmap stays valid. Each codepoint
+/// must be unique and within the BMP Private Use Area `0xE000..0xF8FF` — the
+/// block icon fonts use and the one the font's OS/2 coverage advertises.
+/// Throws [ArgumentError] if a glyph's name is missing from the map or its
+/// codepoint is out of range or duplicated.
 ///
 /// Returns an instance of [SvgToOtfResult] class containing glyphs and a font.
 SvgToOtfResult svgToOtf({
   required Map<String, String> svgMap,
+  Map<String, int>? charCodes,
   bool? ignoreShapes,
   bool? normalize,
   String? fontName,
@@ -61,6 +70,7 @@ SvgToOtfResult svgToOtf({
     normalize: normalize,
     useOpenType: true,
     usePostV2: true,
+    charCodes: charCodes,
   );
 
   return SvgToOtfResult._(glyphList, font);
