@@ -68,6 +68,7 @@ class OpenTypeFont implements BinaryCodable {
     bool? useOpenType,
     bool? usePostV2,
     bool? normalize,
+    Map<String, int>? charCodes,
   }) {
     if (fontName?.isEmpty ?? false) {
       fontName = null;
@@ -80,7 +81,9 @@ class OpenTypeFont implements BinaryCodable {
     normalize ??= true;
     usePostV2 ??= false;
 
-    glyphList = _generateCharCodes(glyphList);
+    glyphList = charCodes != null
+        ? _applyCharCodes(glyphList, charCodes)
+        : _generateCharCodes(glyphList);
 
     // A power of two is recommended only for TrueType outlines
     final unitsPerEm =
@@ -289,6 +292,19 @@ class OpenTypeFont implements BinaryCodable {
   static List<GenericGlyph> _generateCharCodes(List<GenericGlyph> glyphList) {
     for (var i = 0; i < glyphList.length; i++) {
       glyphList[i].metadata.charCode = kUnicodePrivateUseAreaStart + i;
+    }
+    return glyphList;
+  }
+
+  static List<GenericGlyph> _applyCharCodes(
+      List<GenericGlyph> glyphList, Map<String, int> charCodes) {
+    for (final glyph in glyphList) {
+      final name = glyph.metadata.name;
+      final cp = charCodes[name];
+      if (cp == null) {
+        throw ArgumentError('No codepoint provided for glyph "$name"');
+      }
+      glyph.metadata.charCode = cp;
     }
     return glyphList;
   }
