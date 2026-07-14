@@ -53,4 +53,14 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('svgToOtf rejects surrogate codepoints', () {
+    expect(
+      () => svgToOtf(
+        svgMap: {'square': _squareSvg},
+        charCodes: {'square': 0xD800},
+      ),
+      throwsArgumentError,
+    );
+  });
 }

@@ -304,6 +304,12 @@ class OpenTypeFont implements BinaryCodable {
   // reserves 0xFFFF as its mandatory terminator segment.
   static const _kMaxCharCode = 0xFFFF - 1;
 
+  // The UTF-16 surrogate block is reserved and is never a valid Unicode scalar
+  // value, so a surrogate written into the cmap yields a font consumers cannot
+  // look up. It falls inside the BMP range above, so exclude it explicitly.
+  static const _kSurrogateStart = 0xD800;
+  static const _kSurrogateEnd = 0xDFFF;
+
   static List<GenericGlyph> _applyCharCodes(
       List<GenericGlyph> glyphList, Map<String, int> charCodes) {
     final usedCharCodes = <int>{};
@@ -318,11 +324,15 @@ class OpenTypeFont implements BinaryCodable {
 
       // Codepoints outside this range corrupt the BMP-only cmap format 4 and
       // OS/2 tables (values above 0xFFFF are silently truncated by the 16-bit
-      // encoders) or collide with the reserved space/terminator codepoints.
-      if (charCode < _kMinCharCode || charCode > _kMaxCharCode) {
+      // encoders) or collide with the reserved space/terminator codepoints;
+      // surrogates are reserved and never valid cmap entries.
+      if (charCode < _kMinCharCode ||
+          charCode > _kMaxCharCode ||
+          (charCode >= _kSurrogateStart && charCode <= _kSurrogateEnd)) {
         throw ArgumentError('Codepoint for glyph "$name" must be in the range '
             '$_kMinCharCode..$_kMaxCharCode (BMP, excluding the reserved '
-            'space and cmap terminator codepoints), got $charCode');
+            'space, cmap terminator, and UTF-16 surrogate codepoints), '
+            'got $charCode');
       }
 
       if (!usedCharCodes.add(charCode)) {
