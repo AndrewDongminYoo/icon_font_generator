@@ -29,10 +29,10 @@ class SvgToOtfResult {
 /// `charCodes[n]` instead of the default sequential
 /// `kUnicodePrivateUseAreaStart + index` assignment. Glyphs are reordered by
 /// their assigned codepoint so the generated cmap stays valid. Each codepoint
-/// must be unique and within the BMP range `0x21..0xFFFE` (the space `0x20`
-/// and the cmap terminator `0xFFFF` are reserved). Throws [ArgumentError] if a
-/// glyph's name is missing from the map or its codepoint is out of range or
-/// duplicated.
+/// must be unique and within the BMP Private Use Area `0xE000..0xF8FF` — the
+/// block icon fonts use and the one the font's OS/2 coverage advertises.
+/// Throws [ArgumentError] if a glyph's name is missing from the map or its
+/// codepoint is out of range or duplicated.
 ///
 /// Returns an instance of [SvgToOtfResult] class containing glyphs and a font.
 SvgToOtfResult svgToOtf({

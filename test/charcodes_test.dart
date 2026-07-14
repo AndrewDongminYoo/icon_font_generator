@@ -53,4 +53,16 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('svgToOtf rejects BMP codepoints outside the Private Use Area', () {
+    // 0x2605 (Miscellaneous Symbols) is a valid BMP code but is not covered by
+    // the font's advertised OS/2 ranges (Basic Latin + PUA), so it is rejected.
+    expect(
+      () => svgToOtf(
+        svgMap: {'star': _squareSvg},
+        charCodes: {'star': 0x2605},
+      ),
+      throwsArgumentError,
+    );
+  });
 }

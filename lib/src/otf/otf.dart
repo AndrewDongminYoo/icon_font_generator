@@ -296,13 +296,14 @@ class OpenTypeFont implements BinaryCodable {
     return glyphList;
   }
 
-  // Lowest assignable codepoint: must be above the reserved space glyph (0x20)
-  // so custom glyphs always sort after it in the cmap.
-  static const _kMinCharCode = kUnicodeSpaceCharCode + 1;
-
-  // Highest assignable codepoint: the cmap format 4 subtable is BMP-only and
-  // reserves 0xFFFF as its mandatory terminator segment.
-  static const _kMaxCharCode = 0xFFFF - 1;
+  // Explicit codepoints are restricted to the BMP Private Use Area
+  // (U+E000..U+F8FF): it is what icon fonts use, it is encoded correctly by
+  // both cmap format 4 and 12, and — unlike arbitrary BMP values — it stays
+  // within the coverage advertised by the OS/2 ulUnicodeRange bits (Basic
+  // Latin + PUA), so consumers that use OS/2 for font fallback still find the
+  // glyphs.
+  static const _kMinCharCode = kUnicodePrivateUseAreaStart; // 0xE000
+  static const _kMaxCharCode = 0xF8FF; // BMP PUA end
 
   static List<GenericGlyph> _applyCharCodes(
       List<GenericGlyph> glyphList, Map<String, int> charCodes) {
@@ -316,13 +317,13 @@ class OpenTypeFont implements BinaryCodable {
         throw ArgumentError('No codepoint provided for glyph "$name"');
       }
 
-      // Codepoints outside this range corrupt the BMP-only cmap format 4 and
-      // OS/2 tables (values above 0xFFFF are silently truncated by the 16-bit
-      // encoders) or collide with the reserved space/terminator codepoints.
+      // Outside the PUA the value would either be truncated by the 16-bit
+      // format-4 encoder (non-BMP) or fall outside the font's advertised OS/2
+      // coverage (other BMP blocks), so reject it.
       if (charCode < _kMinCharCode || charCode > _kMaxCharCode) {
-        throw ArgumentError('Codepoint for glyph "$name" must be in the range '
-            '$_kMinCharCode..$_kMaxCharCode (BMP, excluding the reserved '
-            'space and cmap terminator codepoints), got $charCode');
+        throw ArgumentError(
+            'Codepoint for glyph "$name" must be in the BMP Private Use Area '
+            '(0xE000..0xF8FF), got $charCode');
       }
 
       if (!usedCharCodes.add(charCode)) {
