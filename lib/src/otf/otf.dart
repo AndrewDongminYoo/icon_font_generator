@@ -296,16 +296,48 @@ class OpenTypeFont implements BinaryCodable {
     return glyphList;
   }
 
+  // Lowest assignable codepoint: must be above the reserved space glyph (0x20)
+  // so custom glyphs always sort after it in the cmap.
+  static const _kMinCharCode = kUnicodeSpaceCharCode + 1;
+
+  // Highest assignable codepoint: the cmap format 4 subtable is BMP-only and
+  // reserves 0xFFFF as its mandatory terminator segment.
+  static const _kMaxCharCode = 0xFFFF - 1;
+
   static List<GenericGlyph> _applyCharCodes(
       List<GenericGlyph> glyphList, Map<String, int> charCodes) {
+    final usedCharCodes = <int>{};
+
     for (final glyph in glyphList) {
       final name = glyph.metadata.name;
-      final cp = charCodes[name];
-      if (cp == null) {
+      final charCode = charCodes[name];
+
+      if (charCode == null) {
         throw ArgumentError('No codepoint provided for glyph "$name"');
       }
-      glyph.metadata.charCode = cp;
+
+      // Codepoints outside this range corrupt the BMP-only cmap format 4 and
+      // OS/2 tables (values above 0xFFFF are silently truncated by the 16-bit
+      // encoders) or collide with the reserved space/terminator codepoints.
+      if (charCode < _kMinCharCode || charCode > _kMaxCharCode) {
+        throw ArgumentError('Codepoint for glyph "$name" must be in the range '
+            '$_kMinCharCode..$_kMaxCharCode (BMP, excluding the reserved '
+            'space and cmap terminator codepoints), got $charCode');
+      }
+
+      if (!usedCharCodes.add(charCode)) {
+        throw ArgumentError(
+            'Duplicate codepoint $charCode assigned to glyph "$name"');
+      }
+
+      glyph.metadata.charCode = charCode;
     }
+
+    // cmap format 4/12 segment generation assumes char codes are ascending in
+    // glyph order, so sort glyphs by their assigned codepoint before returning.
+    glyphList
+        .sort((a, b) => a.metadata.charCode!.compareTo(b.metadata.charCode!));
+
     return glyphList;
   }
 
